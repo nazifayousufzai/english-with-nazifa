@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>English with Nazifa</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<section id="python-vocabulary" style="padding:40px 20px;background:#f3f7f6;text-align:center;">
+  <h2>Learn English with Python</h2>
+  <p>Explore vocabulary from our learning system.</p>
+  <div id="vocabulary-list">Loading vocabulary...</div>
+</section>
+
+<script>
+fetch("/api/vocabulary")
+  .then(response => {
+    if (!response.ok) throw new Error("Could not load vocabulary");
+    return response.json();
+  })
+  .then(words => {
+    const list = document.getElementById("vocabulary-list");
+    list.innerHTML = "";
+
+    words.forEach(item => {
+      const card = document.createElement("div");
+      card.style.cssText =
+        "background:white;padding:18px;margin:12px auto;max-width:500px;border-radius:12px;text-align:left;";
+
+      const word = document.createElement("h3");
+      word.textContent = item.word;
+
+      const meaning = document.createElement("p");
+      meaning.textContent = "Meaning: " + item.meaning;
+
+      const example = document.createElement("p");
+      example.textContent = "Example: " + item.example;
+
+      card.append(word, meaning, example);
+      list.appendChild(card);
+    });
+  })
+  .catch(() => {
+    document.getElementById("vocabulary-list").textContent =
+      "Could not connect to the Python server.";
+  });
+</script>
+<section id="vocabulary-quiz" class="quiz-section">
+  <h2>Test Your English</h2>
+  <p>Choose the correct meaning of each word.</p>
+
+  <div id="quiz-card">
+    <p id="question-number">Question 1</p>
+    <h3 id="quiz-word">Loading...</h3>
+    <div id="quiz-options"></div>
+    <p id="quiz-feedback" aria-live="polite"></p>
+    <button id="next-question" type="button" disabled>
+      Next Question →
+    </button>
+  </div>
+
+  <div id="quiz-result" hidden>
+    <h3>Quiz Completed!</h3>
+    <p id="final-score"></p>
+    <button id="restart-quiz" type="button">
+      Try Again
+    </button>
+  </div>
+</section>
+
+<style>
+  .quiz-section {
+    padding: 45px 20px;
+    background: #f5f7ff;
+    text-align: center;
+  }
+
+  #quiz-card,
+  #quiz-result {
+    max-width: 520px;
+    margin: 22px auto;
+    padding: 25px;
+    background: white;
+    border-radius: 18px;
+    box-shadow: 0 8px 25px #17255412;
+  }
+
+  #quiz-word {
+    font-size: 28px;
+    color: #4f68f8;
+  }
+
+  #quiz-options {
+    display: grid;
+    gap: 10px;
+    margin: 20px 0;
+  }
+
+  #quiz-options button,
+  #next-question,
+  #restart-quiz {
+    padding: 12px 16px;
+    border: 1px solid #d9def5;
+    border-radius: 10px;
+    background: white;
+    cursor: pointer;
+    font-size: 15px;
+  }
+
+  #quiz-options button:hover,
+  #next-question:not(:disabled):hover,
+  #restart-quiz:hover {
+    background: #eef1ff;
+  }
+
+  #next-question,
+  #restart-quiz {
+    background: #4f68f8;
+    color: white;
+    border: none;
+  }
+
+  #next-question:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  #quiz-feedback {
+    min-height: 24px;
+    font-weight: bold;
+  }
+</style>
+
+<script>
+(async function () {
+  const wordElement = document.getElementById("quiz-word");
+  const optionsElement = document.getElementById("quiz-options");
+  const feedbackElement = document.getElementById("quiz-feedback");
+  const numberElement = document.getElementById("question-number");
+  const nextButton = document.getElementById("next-question");
+  const cardElement = document.getElementById("quiz-card");
+  const resultElement = document.getElementById("quiz-result");
+
+  let questions = [];
+  let current = 0;
+  let score = 0;
+  let answered = false;
+
+  function shuffle(items) {
+    return [...items].sort(() => Math.random() - 0.5);
+  }
+
+  function showQuestion() {
+    answered = false;
+    feedbackElement.textContent = "";
+    optionsElement.innerHTML = "";
+    nextButton.disabled = true;
+    nextButton.textContent =
+      current === questions.length - 1
+        ? "See My Result"
+        : "Next Question →";
+
+    const question = questions[current];
+    numberElement.textContent =
+      `Question ${current + 1} of ${questions.length}`;
+    wordElement.textContent = question.word;
+
+    const wrongAnswers = shuffle(
+      questions
+        .filter(item => item.word !== question.word)
+        .map(item => item.meaning)
+        .filter((meaning, index, all) =>
+          meaning && meaning !== question.meaning &&
+          all.indexOf(meaning) === index
+        )
+    ).slice(0, 3);
+
+    const options = shuffle([
+      question.meaning,
+      ...wrongAnswers
+    ]);
+
+    options.forEach(meaning => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = meaning;
+
+      button.addEventListener("click", () => {
+        if (answered) return;
+        answered = true;
+
+        if (meaning === question.meaning) {
+          score++;
+          feedbackElement.textContent = "Correct! Well done! 🎉";
+        } else {
+          feedbackElement.textContent =
+            "Not quite. Correct answer: " + question.meaning;
+        }
+
+        nextButton.disabled = false;
+        optionsElement.querySelectorAll("button").forEach(option => {
+          option.disabled = true;
+        });
+      });
+
+      optionsElement.appendChild(button);
+    });
+  }
+
+  async function startQuiz() {
+    try {
+      const response = await fetch("/api/vocabulary");
+      if (!response.ok) throw new Error("Vocabulary unavailable");
+
+      const vocabulary = await response.json();
+      const usable = vocabulary.filter(
+        item => item.word && item.meaning
+      );
+
+      if (usable.length < 2) {
+        throw new Error("Not enough vocabulary");
+      }
+
+      questions = shuffle(usable).slice(0, Math.min(10, usable.length));
+      current = 0;
+      score = 0;
+      cardElement.hidden = false;
+      resultElement.hidden = true;
+      showQuestion();
+    } catch (error) {
+      wordElement.textContent = "Could not load the quiz.";
+      feedbackElement.textContent =
+        "Please check that the Python server is running.";
+    }
+  }
+
+  nextButton.addEventListener("click", async () => {
+    if (!answered) return;
+
+    current++;
+
+    if (current < questions.length) {
+      showQuestion();
+      return;
+    }
+
+    cardElement.hidden = true;
+    resultElement.hidden = false;
+    document.getElementById("final-score").textContent =
+      `Your score: ${score} / ${questions.length}`;
+
+    try {
+      await fetch("/api/quiz-result", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          score,
+          total: questions.length
+        })
+      });
+    } catch (error) {
+      console.error("Could not save quiz result:", error);
+    }
+  });
+
+  document.getElementById("restart-quiz")
+    .addEventListener("click", startQuiz);
+
+  await startQuiz();
+})();
+</script>
+
+</body>
+
+
+    <!-- Navigation -->
+    <header class="header">
+        <nav class="navbar">
+
+            <a href="#" class="logo">
+                English <span>with Nazifa</span>
+            </a>
+
+            <ul class="nav-links">
+                <a href="index.html">Home</a>
+<a href="about.html">About</a>
+<a href="services.html">Services</a>
+<a href="contact.html">Contact</a>
+            </ul>
+            <button class="menu-toggle" aria-label="open Menu">
+                <a href="#Courses" class="nav-button"> Join Course</a>
+            </button>
+
+            <a href="#contact" class="nav-button">
+                Join a Course
+            </a>
+
+        </nav>
+    </header>
+
+
+    <!-- Hero Section -->
+    <main>
+
+        <section id="home" class="hero">
+
+            <div class="hero-content">
+
+                <p class="small-title">
+                    WELCOME TO ENGLISH WITH NAZIFA
+                </p>
+
+                <h1>
+                    Learn English.
+                    <span>Build Confidence.</span>
+                    Achieve Your Goals.
+                </h1>
+
+                <p class="hero-text">
+                    Improve your English skills with practical,
+                    friendly and engaging lessons designed to help
+                    you speak with confidence.
+                </p>
+
+                <div class="hero-buttons">
+
+                    <a href="#courses" class="btn primary-btn">
+                        Explore Courses
+                    </a>
+
+                    <a href="#about" class="btn secondary-btn">
+                        Meet Nazifa
+                    </a>
+
+                </div>
+
+                <div class="hero-stats">
+
+                    <div>
+                        <strong>3+</strong>
+                        <span>Years Experience</span>
+                    </div>
+
+                    <div>
+                        <strong>4</strong>
+                        <span>English Skills</span>
+                    </div>
+
+                    <div>
+                        <strong>100%</strong>
+                        <span>Learning Support</span>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="hero-card">
+
+                <div class="card-icon">
+                    EN
+                </div>
+
+                <h3>
+                    Your English Journey Starts Here
+                </h3>
+
+                <p>
+                    Speak better. Write better.
+                    Feel more confident.
+                </p>
+
+                <div class="progress-box">
+
+                    <div class="progress-title">
+                        <span>English Skills</span>
+                        <span>Growing</span>
+                    </div>
+
+                    <div class="progress">
+                        <div class="progress-bar"></div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- Courses -->
+        <section id="courses" class="section">
+
+            <div class="section-heading">
+
+                <p class="section-label">
+                    LEARNING PROGRAMS
+                </p>
+
+                <h2>
+                    Choose Your English Course
+                </h2>
+
+                <p>
+                    Practical lessons for learners who want
+                    real improvement.
+                </p>
+
+            </div>
+
+
+            <div class="courses-grid">
+
+                <article class="course-card">
+
+                    <div class="course-number">
+                        01
+                    </div>
+
+                    <h3>
+                        General English
+                    </h3>
+
+                    <p>
+                        Build your grammar, vocabulary,
+                        speaking and everyday English.
+                    </p>
+
+                    <a href="#contact">
+                        Learn More →
+                    </a>
+
+                </article>
+
+
+                <article class="course-card featured">
+
+                    <div class="course-number">
+                        02
+                    </div>
+
+                    <h3>
+                        Speaking & Conversation
+                    </h3>
+
+                    <p>
+                        Practice speaking naturally and
+                        become more confident in conversations.
+                    </p>
+
+                    <a href="#contact">
+                        Learn More →
+                    </a>
+
+                </article>
+
+
+                <article class="course-card">
+
+                    <div class="course-number">
+                        03
+                    </div>
+
+                    <h3>
+                        English Writing
+                    </h3>
+
+                    <p>
+                        Improve your sentences, paragraphs,
+                        emails and academic writing.
+                    </p>
+
+                    <a href="#contact">
+                        Learn More →
+                    </a>
+
+                </article>
+
+            </div>
+
+        </section>
+
+
+        <!-- About -->
+        <section id="about" class="about-section">
+
+            <div class="about-content">
+
+                <p class="section-label">
+                    ABOUT THE TEACHER
+                </p>
+
+                <h2>
+                    Meet Nazifa
+                </h2>
+
+                <p>
+                    Hello! I’m Nazifa Yousufzai, an English
+                    language instructor passionate about helping
+                    students learn English with confidence.
+                </p>
+
+                <p>
+                    My goal is to make English learning simple,
+                    practical and enjoyable for every student.
+                </p>
+
+                <a href="#contact" class="btn primary-btn">
+                    Start Learning
+                </a>
+
+            </div>
+
+
+            <div class="about-card">
+
+                <div class="teacher-circle">
+                    N
+                </div>
+
+                <h3>
+                    Nazifa Yousufzai
+                </h3>
+
+                <p>
+                    English Language Instructor
+                </p>
+
+                <div class="teacher-line"></div>
+
+                <span>
+                    Learn • Practice • Grow
+                </span>
+
+            </div>
+
+        </section>
+
+
+        <!-- Why Us -->
+        <section id="features" class="section">
+
+            <div class="section-heading">
+
+                <p class="section-label">
+                    WHY LEARN WITH US
+                </p>
+
+                <h2>
+                    Learning That Makes a Difference
+                </h2>
+
+            </div>
+
+
+            <div class="features-grid">
+
+                <div class="feature">
+
+                    <div class="feature-icon">
+                        01
+                    </div>
+
+                    <h3>
+                        Practical Learning
+                    </h3>
+
+                    <p>
+                        Learn English that you can actually
+                        use in real conversations and daily life.
+                    </p>
+
+                </div>
+
+
+                <div class="feature">
+
+                    <div class="feature-icon">
+                        02
+                    </div>
+
+                    <h3>
+                        Friendly Environment
+                    </h3>
+
+                    <p>
+                        Learn without fear of making mistakes
+                        and build confidence step by step.
+                    </p>
+
+                </div>
+
+
+                <div class="feature">
+
+                    <div class="feature-icon">
+                        03
+                    </div>
+
+                    <h3>
+                        Personal Support
+                    </h3>
+
+                    <p>
+                        Get guidance and encouragement throughout
+                        your learning journey.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+      <!-- Registration -->
+<section id="register" class="registration-section">
+
+    <div class="registration-content">
+
+        <p class="section-label">JOIN US</p>
+
+        <h2>Register for a Course</h2>
+
+        <p>
+            Start your English learning journey with English with Nazifa.
+            Fill out the form below and we will contact you soon.
+        </p>
+
+        <form
+    class="registration-form"
+    action="https://formspree.io/f/mjygygde"
+    method="POST" 
+
+>
+
+            <div class="form-group">
+                <label for="full-name">Full Name</label>
+                <input
+                    type="text"
+                    id="full-name"
+                    name="full-name"
+                    placeholder="Enter your full name"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    placeholder="Enter your phone number"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="course">Choose a Course</label>
+
+                <select id="course" name="course" required>
+                    <option value="">Select a course</option>
+                    <option value="general-english">General English</option>
+                    <option value="spoken-english">Spoken English</option>
+                    <option value="english-grammar">English Grammar</option>
+                    <option value="four-skills">Four Skills of English</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="level">Your English Level</label>
+
+                <select id="level" name="level" required>
+                    <option value="">Select your level</option>
+                    <option value="beginner">Beginner</option>
+                    <option value="elementary">Elementary</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="upper-intermediate">Upper-Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="message">Message</label>
+
+                <textarea
+                    id="message"
+                    name="message"
+                    rows="5"
+                    placeholder="Write your message..."
+                ></textarea>
+            </div>
+
+            <button type="submit" class="register-button">
+                Register Now
+            </button>
+            <div id="registration-message" class="registration-message">
+    🎉 Registration Successful!
+    <br>
+    Thank you for choosing English with Nazifa. 🌸
+    <br>
+    We will contact you soon.
+</div>
+
+        </form>
+
+    </div>
+
+</section> 
+        <!-- Contact -->
+        <section id="contact" class="contact-section">
+
+            <div class="contact-content">
+
+                <p class="section-label">
+                    GET IN TOUCH
+                </p>
+
+                <h2>
+                    Ready to Improve Your English?
+                </h2>
+
+                <p>
+                    Send a message and let's start your
+                    English learning journey.
+                </p>
+
+            </div>
+
+
+            <form class="contact-form">
+
+                <input
+                    type="text"
+                    placeholder="Your Name"
+                    required
+                >
+
+                <input
+                    type="email"
+                    placeholder="Your Email"
+                    required
+                >
+
+                <textarea
+                    placeholder="Tell me about your English goals..."
+                    rows="5"
+                    required
+                ></textarea>
+
+                <button type="submit" class="btn primary-btn">
+                    Send Message
+                </button>
+
+            </form>
+
+        </section>
+
+    </main>
+
+
+    <!-- Footer -->
+    <footer class="footer">
+
+        <div>
+            <h3>
+                English <span>with Nazifa</span>
+            </h3>
+
+            <p>
+                Learn English • Build Confidence •
+                Achieve Your Goals
+            </p>
+        </div>
+
+        <p class="copyright">
+            © 2026 English with Nazifa. All rights reserved.
+        </p>
+
+    </footer>
+
+
+    <script src="script.js"></script> 
+
+
+</body>
+</html>"
