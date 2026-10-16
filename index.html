@@ -11,67 +11,6 @@
 
 <body>
 
-<section id="python-vocabulary" style="padding:40px 20px;background:#f3f7f6;text-align:center;">
-  <h2>Learn English with Python</h2>
-  <p>Explore vocabulary from our learning system.</p>
-  <div id="vocabulary-list">Loading vocabulary...</div>
-</section>
-
-<script>
-fetch("/api/vocabulary")
-  .then(response => {
-    if (!response.ok) throw new Error("Could not load vocabulary");
-    return response.json();
-  })
-  .then(words => {
-    const list = document.getElementById("vocabulary-list");
-    list.innerHTML = "";
-
-    words.forEach(item => {
-      const card = document.createElement("div");
-      card.style.cssText =
-        "background:white;padding:18px;margin:12px auto;max-width:500px;border-radius:12px;text-align:left;";
-
-      const word = document.createElement("h3");
-      word.textContent = item.word;
-
-      const meaning = document.createElement("p");
-      meaning.textContent = "Meaning: " + item.meaning;
-
-      const example = document.createElement("p");
-      example.textContent = "Example: " + item.example;
-
-      card.append(word, meaning, example);
-      list.appendChild(card);
-    });
-  })
-  .catch(() => {
-    document.getElementById("vocabulary-list").textContent =
-      "Could not connect to the Python server.";
-  });
-</script>
-<section id="vocabulary-quiz" class="quiz-section">
-  <h2>Test Your English</h2>
-  <p>Choose the correct meaning of each word.</p>
-
-  <div id="quiz-card">
-    <p id="question-number">Question 1</p>
-    <h3 id="quiz-word">Loading...</h3>
-    <div id="quiz-options"></div>
-    <p id="quiz-feedback" aria-live="polite"></p>
-    <button id="next-question" type="button" disabled>
-      Next Question →
-    </button>
-  </div>
-
-  <div id="quiz-result" hidden>
-    <h3>Quiz Completed!</h3>
-    <p id="final-score"></p>
-    <button id="restart-quiz" type="button">
-      Try Again
-    </button>
-  </div>
-</section>
 
 <style>
   .quiz-section {
@@ -253,20 +192,6 @@ fetch("/api/vocabulary")
     resultElement.hidden = false;
     document.getElementById("final-score").textContent =
       `Your score: ${score} / ${questions.length}`;
-
-    try {
-      await fetch("/api/quiz-result", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          score,
-          total: questions.length
-        })
-      });
-    } catch (error) {
-      console.error("Could not save quiz result:", error);
-    }
-  });
 
   document.getElementById("restart-quiz")
     .addEventListener("click", startQuiz);
